@@ -26,33 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 if (isset($_GET['delete'])) {
     $teacherId = $_GET['delete'];
-    
-    $conn->begin_transaction();
-    
-    try {
-        // First delete all courses taught by this teacher
-        $stmt = $conn->prepare("DELETE FROM courses WHERE teacher_id = ?");
-        $stmt->bind_param("i", $teacherId);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Then delete the teacher
-        $stmt = $conn->prepare("DELETE FROM teachers WHERE teacher_id = ?");
-        $stmt->bind_param("i", $teacherId);
-        
-        if ($stmt->execute()) {
-            $_SESSION['message'] = "Teacher and associated courses deleted successfully";
-        } else {
-            $_SESSION['error'] = "Error deleting teacher: " . $conn->error;
-        }
-        
-        $stmt->close();
-        $conn->commit();
-    } catch (Exception $e) {
-        $conn->rollback();
-        $_SESSION['error'] = "Error deleting teacher: " . $e->getMessage();
+
+    $stmt = $conn->prepare("DELETE FROM teachers WHERE teacher_id = ?");
+    $stmt->bind_param("i", $teacherId);
+
+    if ($stmt->execute()) {
+        $_SESSION['message'] = "Teacher deleted successfully. Associated courses were unlinked.";
+    } else {
+        $_SESSION['error'] = "Error deleting teacher: " . $conn->error;
     }
-    
+
+    $stmt->close();
     header("Location: teachers.php");
     exit;
 }
