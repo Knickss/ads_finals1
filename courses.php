@@ -62,6 +62,14 @@ $courses = $conn->query("
     JOIN teachers t ON c.teacher_id = t.teacher_id
 ");
 
+// Create a copy of the courses result to use in the dropdown
+// Get unique course names to avoid duplicates
+$coursesDropdown = $conn->query("
+    SELECT DISTINCT course_name 
+    FROM courses
+    ORDER BY course_name
+");
+
 // Get all teachers for dropdown
 $teachers = $conn->query("SELECT * FROM teachers");
 ?>
@@ -94,10 +102,25 @@ $teachers = $conn->query("SELECT * FROM teachers");
                 <input type="text" id="course_name" name="course_name" required>
             </div>
             <div class="form-group">
+                <label for="existing_courses">Existing Courses</label>
+                <select id="existing_courses" onchange="selectExistingCourse(this.value)">
+                    <option value="">-- Select Existing Course --</option>
+                    <?php while($course = $coursesDropdown->fetch_assoc()): ?>
+                    <option value="<?php echo $course['course_name']; ?>">
+                        <?php echo $course['course_name']; ?>
+                    </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="teacher_id">Teacher</label>
                 <select id="teacher_id" name="teacher_id" required>
                     <option value="">Select Teacher</option>
-                    <?php while($teacher = $teachers->fetch_assoc()): ?>
+                    <?php 
+                    // Reset the teachers result pointer to the beginning
+                    $teachers->data_seek(0);
+                    while($teacher = $teachers->fetch_assoc()): 
+                    ?>
                     <option value="<?php echo $teacher['teacher_id']; ?>">
                         <?php echo $teacher['first_name'] . ' ' . $teacher['last_name']; ?>
                     </option>
@@ -120,7 +143,11 @@ $teachers = $conn->query("SELECT * FROM teachers");
                 </tr>
             </thead>
             <tbody>
-                <?php while($course = $courses->fetch_assoc()): ?>
+                <?php 
+                // Reset the courses result pointer to the beginning
+                $courses->data_seek(0);
+                while($course = $courses->fetch_assoc()): 
+                ?>
                 <tr>
                     <td><?php echo $course['course_id']; ?></td>
                     <td><?php echo $course['course_name']; ?></td>
@@ -146,10 +173,18 @@ $teachers = $conn->query("SELECT * FROM teachers");
             document.getElementById('cancel_edit').style.display = 'inline-block';
         }
         
+        function selectExistingCourse(courseName) {
+            if (!courseName) return;
+            
+            // Just fill the course name field, leaving teacher selection to the user
+            document.getElementById('course_name').value = courseName;
+        }
+        
         document.getElementById('cancel_edit').addEventListener('click', function() {
             document.getElementById('course_id').value = '';
             document.getElementById('course_name').value = '';
             document.getElementById('teacher_id').value = '';
+            document.getElementById('existing_courses').value = '';
             
             document.querySelector('button[name="add"]').style.display = 'inline-block';
             document.querySelector('button[name="update"]').style.display = 'none';
