@@ -87,6 +87,9 @@ $teachers = $conn->query("SELECT * FROM teachers");
         th {
             background-color: #333;
             color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .action-links a {
@@ -120,9 +123,14 @@ $teachers = $conn->query("SELECT * FROM teachers");
         }
 
         .scrollable-table {
-            max-height: 400px;
+            max-height: 300px;
             overflow-y: auto;
             border: 1px solid #ccc;
+        }
+
+        /* Ensure smooth scrolling and better scroll wheel experience */
+        .scrollable-table {
+            scroll-behavior: smooth;
         }
     </style>
 </head>
@@ -172,7 +180,7 @@ $teachers = $conn->query("SELECT * FROM teachers");
     <button class="btn btn-clear" onclick="clearSearch()">Clear</button>
 
     <h2>Teacher List</h2>
-    <div class="scrollable-table">
+    <div class="scrollable-table" id="tableContainer">
         <table id="teacherTable">
             <thead>
                 <tr>
@@ -236,9 +244,22 @@ $teachers = $conn->query("SELECT * FROM teachers");
         document.getElementById('searchInput').value = '';
         searchTable();
     }
+
+    // Add scroll wheel support
+    const tableContainer = document.getElementById('tableContainer');
+    
+    tableContainer.addEventListener('wheel', function(e) {
+        // Prevent default scroll behavior
+        e.preventDefault();
+        
+        // Calculate scroll amount based on wheel delta
+        const scrollAmount = e.deltaY;
+        
+        // Scroll the container
+        tableContainer.scrollTop += scrollAmount;
+    }, { passive: false });
 </script>
 </body>
 </html>
 
 <?php $conn->close(); ?>
-
