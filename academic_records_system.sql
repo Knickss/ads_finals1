@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 07, 2025 at 02:42 PM
+-- Generation Time: May 12, 2025 at 03:46 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -40,10 +40,11 @@ CREATE TABLE `courses` (
 INSERT INTO `courses` (`course_id`, `course_name`, `teacher_id`) VALUES
 (1, 'Introduction to Cloud Engineering', 1),
 (16, 'Machine Learning', 2),
-(28, 'Botany', NULL),
-(29, 'Botany', NULL),
-(30, 'Botany', 19),
-(31, 'Taylor Series', 19);
+(31, 'Taylor Series', 20),
+(37, 'Alchemy', 25),
+(38, 'Rocket Science', 24),
+(39, 'General', 25),
+(40, 'Culinary', 23);
 
 -- --------------------------------------------------------
 
@@ -63,7 +64,13 @@ CREATE TABLE `enrollments` (
 --
 
 INSERT INTO `enrollments` (`enrollment_id`, `student_id`, `course_id`, `enroll_date`) VALUES
-(1, 1, 1, '2025-05-01');
+(1, 1, 1, '2025-05-01'),
+(7, 2, 31, '2025-04-30'),
+(9, 5, 16, '2025-04-01'),
+(10, 9, 38, '2026-06-17'),
+(11, 14, 40, '2025-05-30'),
+(12, 6, 37, '2025-08-21'),
+(13, 7, 38, '2025-10-16');
 
 -- --------------------------------------------------------
 
@@ -85,7 +92,11 @@ CREATE TABLE `students` (
 INSERT INTO `students` (`student_id`, `first_name`, `last_name`, `email`) VALUES
 (1, 'Princess', 'Carolyn', 'princess.carolyn@gmail.com'),
 (2, 'Diane', 'Nguyen', 'diane.nguyen@gmail.com'),
-(5, 'Niccolo', 'Abella', 'niccolochi09@gmail.com');
+(5, 'Niccolo', 'Abella', 'niccolochi09@gmail.com'),
+(6, 'Bojack ', 'Horseman', 'obviously@gmail.com'),
+(7, 'Asha', 'Maniacop', 'asha@gmail.com'),
+(9, 'Super', 'Man', 'dchero@gmail.com'),
+(14, 'Bat', 'Man', 'batguy@gmail.com');
 
 -- --------------------------------------------------------
 
@@ -107,7 +118,13 @@ CREATE TABLE `teachers` (
 INSERT INTO `teachers` (`teacher_id`, `first_name`, `last_name`, `email`) VALUES
 (1, 'John', 'Doe', 'john.doe@gmail.com'),
 (2, 'Maria', 'Clara', 'maria.clara@gmail.com'),
-(19, 'Anime', 'Man', 'weeb@gmail.com');
+(20, 'Justin', 'Bieber', 'justinbieber@gmail.com'),
+(21, 'Abel', 'Tesfaye', 'theweeknd@gmail.com'),
+(22, 'Jose', 'Rizal', 'joserizal@gmail.com'),
+(23, 'Gordon ', 'Ramsay', 'gordon@gmail.com'),
+(24, 'christian', 'cuevas', 'cjcj@gmail.com'),
+(25, 'Teacher', 'Sensei', 'prof@gmail.com'),
+(26, 'random', 'random', 'random@gmail.com');
 
 --
 -- Indexes for dumped tables
@@ -148,25 +165,25 @@ ALTER TABLE `teachers`
 -- AUTO_INCREMENT for table `courses`
 --
 ALTER TABLE `courses`
-  MODIFY `course_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `course_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `enrollments`
 --
 ALTER TABLE `enrollments`
-  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `teachers`
 --
 ALTER TABLE `teachers`
-  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- Constraints for dumped tables
