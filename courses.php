@@ -162,7 +162,7 @@ $teachers = $conn->query("SELECT * FROM teachers");
         }
 
         .scrollable-table {
-            max-height: 400px;
+            max-height: 300px;
             overflow-y: auto;
             border: 1px solid #ccc;
         }
