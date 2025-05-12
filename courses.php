@@ -1,15 +1,36 @@
-<?php include("dbconnection.php");
+<?php 
+include("dbconnection.php");
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add'])) {
         $courseName = $_POST['course_name'];
         $teacherId = $_POST['teacher_id'];
-        
-        $stmt = $conn->prepare("INSERT INTO courses (course_name, teacher_id) VALUES (?, ?)");
-        $stmt->bind_param("si", $courseName, $teacherId);
-        $stmt->execute();
-        $stmt->close();
+
+        // Check if course already exists (regardless of teacher)
+        $check = $conn->prepare("SELECT course_id FROM courses WHERE course_name = ?");
+        $check->bind_param("s", $courseName);
+        $check->execute();
+        $check->store_result();
+
+        if ($check->num_rows > 0) {
+            // Course exists, update the teacher
+            $check->bind_result($existingCourseId);
+            $check->fetch();
+
+            $stmt = $conn->prepare("UPDATE courses SET teacher_id = ? WHERE course_id = ?");
+            $stmt->bind_param("ii", $teacherId, $existingCourseId);
+            $stmt->execute();
+            $stmt->close();
+        } else {
+            // Course doesn't exist, insert new
+            $stmt = $conn->prepare("INSERT INTO courses (course_name, teacher_id) VALUES (?, ?)");
+            $stmt->bind_param("si", $courseName, $teacherId);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $check->close();
     } elseif (isset($_POST['update'])) {
         $courseId = $_POST['course_id'];
         $courseName = $_POST['course_name'];
@@ -28,13 +49,11 @@ if (isset($_GET['delete'])) {
     $conn->begin_transaction();
     
     try {
-        // First delete all enrollments for this course
         $stmt = $conn->prepare("DELETE FROM enrollments WHERE course_id = ?");
         $stmt->bind_param("i", $courseId);
         $stmt->execute();
         $stmt->close();
         
-        // Then delete the course
         $stmt = $conn->prepare("DELETE FROM courses WHERE course_id = ?");
         $stmt->bind_param("i", $courseId);
         
@@ -55,22 +74,18 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// Get all courses with teacher names
 $courses = $conn->query("
     SELECT c.course_id, c.course_name, c.teacher_id, t.first_name, t.last_name 
     FROM courses c
     JOIN teachers t ON c.teacher_id = t.teacher_id
 ");
 
-// Create a copy of the courses result to use in the dropdown
-// Get unique course names to avoid duplicates
 $coursesDropdown = $conn->query("
     SELECT DISTINCT course_name 
     FROM courses
     ORDER BY course_name
 ");
 
-// Get all teachers for dropdown
 $teachers = $conn->query("SELECT * FROM teachers");
 ?>
 
@@ -117,7 +132,6 @@ $teachers = $conn->query("SELECT * FROM teachers");
                 <select id="teacher_id" name="teacher_id" required>
                     <option value="">Select Teacher</option>
                     <?php 
-                    // Reset the teachers result pointer to the beginning
                     $teachers->data_seek(0);
                     while($teacher = $teachers->fetch_assoc()): 
                     ?>
@@ -144,7 +158,6 @@ $teachers = $conn->query("SELECT * FROM teachers");
             </thead>
             <tbody>
                 <?php 
-                // Reset the courses result pointer to the beginning
                 $courses->data_seek(0);
                 while($course = $courses->fetch_assoc()): 
                 ?>
@@ -175,8 +188,6 @@ $teachers = $conn->query("SELECT * FROM teachers");
         
         function selectExistingCourse(courseName) {
             if (!courseName) return;
-            
-            // Just fill the course name field, leaving teacher selection to the user
             document.getElementById('course_name').value = courseName;
         }
         
