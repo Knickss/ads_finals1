@@ -76,7 +76,7 @@ if (!empty($search)) {
                 OR t.last_name LIKE '%$search%'";
 }
 
-$query .= " ORDER BY e.enrollment_id DESC";
+$query .= " ORDER BY e.enrollment_id ASC";
 $enrollments = $conn->query($query);
 
 // Get all students and courses for dropdowns
