@@ -72,6 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     header("Location: students.php");
     exit;
+} elseif (isset($_GET['view_courses'])) {
+    $studentId = $_GET['view_courses'];
+    $viewCourses = true;
+} else {
+    $viewCourses = false;
 }
 
 // Search query
@@ -84,6 +89,43 @@ if (!empty($searchTerm)) {
     $stmt->close();
 } else {
     $students = $conn->query("SELECT * FROM students");
+}
+
+// Get course enrollment counts using LEFT JOIN
+$studentEnrollmentCounts = $conn->query("
+    SELECT s.student_id, COUNT(e.enrollment_id) as course_count
+    FROM students s
+    LEFT JOIN enrollments e ON s.student_id = e.student_id
+    GROUP BY s.student_id
+");
+
+// Convert to associative array for easy lookup
+$enrollmentCountsByStudent = [];
+while($row = $studentEnrollmentCounts->fetch_assoc()) {
+    $enrollmentCountsByStudent[$row['student_id']] = $row['course_count'];
+}
+
+// Get detailed course info if viewing a specific student's courses
+if ($viewCourses && isset($studentId)) {
+    $stmt = $conn->prepare("
+        SELECT c.course_id, c.course_name, e.enroll_date, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+        FROM enrollments e
+        LEFT JOIN courses c ON e.course_id = c.course_id
+        LEFT JOIN teachers t ON c.teacher_id = t.teacher_id
+        WHERE e.student_id = ?
+        ORDER BY e.enroll_date DESC
+    ");
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $studentCourses = $stmt->get_result();
+    $stmt->close();
+    
+    // Get student name for display
+    $stmt = $conn->prepare("SELECT first_name, last_name FROM students WHERE student_id = ?");
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $studentInfo = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 }
 ?>
 
@@ -144,6 +186,18 @@ if (!empty($searchTerm)) {
         .action-links a {
             margin-right: 8px;
         }
+        .back-link {
+            margin-bottom: 15px;
+            display: block;
+        }
+        .course-badge {
+            background-color: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -166,66 +220,109 @@ if (!empty($searchTerm)) {
             <a href="enrollments.php">Enrollments</a>
         </div>
 
-        <h2>Add New Student</h2>
-        <form method="POST">
-            <input type="hidden" name="student_id" id="student_id">
-            <div class="form-group">
-                <label for="first_name">First Name</label>
-                <input type="text" id="first_name" name="first_name" required>
+        <?php if ($viewCourses && isset($studentId) && isset($studentInfo)): ?>
+            <a href="students.php" class="back-link">← Back to Students List</a>
+            <h2>Courses for <?php echo htmlspecialchars($studentInfo['first_name'] . ' ' . $studentInfo['last_name']); ?></h2>
+            
+            <div class="scrollable-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Course Name</th>
+                            <th>Teacher</th>
+                            <th>Enrollment Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($studentCourses->num_rows > 0): ?>
+                            <?php while($course = $studentCourses->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($course['course_name']); ?></td>
+                                <td><?php echo htmlspecialchars($course['teacher_first_name'] . ' ' . $course['teacher_last_name']); ?></td>
+                                <td><?php echo htmlspecialchars($course['enroll_date']); ?></td>
+                            </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="3">No courses found for this student.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label for="last_name">Last Name</label>
-                <input type="text" id="last_name" name="last_name" required>
+            
+        <?php else: ?>
+            <h2>Add New Student</h2>
+            <form method="POST">
+                <input type="hidden" name="student_id" id="student_id">
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input type="text" id="first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input type="text" id="last_name" name="last_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <button type="submit" name="add">Add Student</button>
+                <button type="submit" name="update" style="display: none;">Update Student</button>
+                <button type="button" id="cancel_edit" style="display: none;">Cancel</button>
+            </form>
+
+            <h2>Search Students</h2>
+            <form method="POST" style="display: inline; margin-bottom: 20px;">
+                <div style="margin-bottom: 10px;">
+                    <input type="text" name="search_term" placeholder="Search by name or email..." value="<?php echo htmlspecialchars($searchTerm); ?>" style="width: 100%; padding: 8px;">
+                </div>
+                <button type="submit" name="search" style="background-color: #333; color: white; padding: 8px 14px; margin-right: 5px;">Search</button>
+            </form>
+            <form method="GET" style="display: inline;">
+                <button type="submit" name="clear" style="background-color: #333; color: white; padding: 8px 14px;">Clear</button>
+            </form>
+
+            <h2>Student List</h2>
+            <div class="scrollable-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Email</th>
+                            <th>Courses</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while($student = $students->fetch_assoc()): ?>
+                        <tr>
+                            <td><?php echo $student['student_id']; ?></td>
+                            <td><?php echo $student['first_name']; ?></td>
+                            <td><?php echo $student['last_name']; ?></td>
+                            <td><?php echo $student['email']; ?></td>
+                            <td>
+                                <?php 
+                                $count = isset($enrollmentCountsByStudent[$student['student_id']]) ? 
+                                    $enrollmentCountsByStudent[$student['student_id']] : 0;
+                                echo $count;
+                                if ($count > 0) {
+                                    echo ' <a href="students.php?view_courses=' . $student['student_id'] . '">View</a>';
+                                }
+                                ?>
+                            </td>
+                            <td class="action-links">
+                                <a href="#" onclick="editStudent(<?php echo $student['student_id']; ?>, '<?php echo $student['first_name']; ?>', '<?php echo $student['last_name']; ?>', '<?php echo $student['email']; ?>')">Edit</a>
+                                <a href="students.php?delete=<?php echo $student['student_id']; ?>" onclick="return confirm('Are you sure you want to delete this student?')">Delete</a>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            <button type="submit" name="add">Add Student</button>
-            <button type="submit" name="update" style="display: none;">Update Student</button>
-            <button type="button" id="cancel_edit" style="display: none;">Cancel</button>
-        </form>
-
-        <h2>Search Students</h2>
-<form method="POST" style="display: inline; margin-bottom: 20px;">
-    <div style="margin-bottom: 10px;">
-        <input type="text" name="search_term" placeholder="Search by name or email..." value="<?php echo htmlspecialchars($searchTerm); ?>" style="width: 100%; padding: 8px;">
-    </div>
-    <button type="submit" name="search" style="background-color: #333; color: white; padding: 8px 14px; margin-right: 5px;">Search</button>
-</form>
-<form method="GET" style="display: inline;">
-    <button type="submit" name="clear" style="background-color: #333; color: white; padding: 8px 14px;">Clear</button>
-</form>
-
-
-        <h2>Student List</h2>
-        <div class="scrollable-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>First Name</th>
-                        <th>Last Name</th>
-                        <th>Email</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while($student = $students->fetch_assoc()): ?>
-                    <tr>
-                        <td><?php echo $student['student_id']; ?></td>
-                        <td><?php echo $student['first_name']; ?></td>
-                        <td><?php echo $student['last_name']; ?></td>
-                        <td><?php echo $student['email']; ?></td>
-                        <td class="action-links">
-                            <a href="#" onclick="editStudent(<?php echo $student['student_id']; ?>, '<?php echo $student['first_name']; ?>', '<?php echo $student['last_name']; ?>', '<?php echo $student['email']; ?>')">Edit</a>
-                            <a href="students.php?delete=<?php echo $student['student_id']; ?>" onclick="return confirm('Are you sure you want to delete this student?')">Delete</a>
-                        </td>
-                    </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        </div>
+        <?php endif; ?>
     </div>
 
     <script>
@@ -254,3 +351,4 @@ if (!empty($searchTerm)) {
 </body>
 </html>
 <?php $conn->close(); ?>
+
