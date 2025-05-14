@@ -71,12 +71,22 @@ if (isset($_GET['delete'])) {
     
     header("Location: courses.php");
     exit;
+} elseif (isset($_GET['view_students'])) {
+    $courseId = $_GET['view_students'];
+    $viewStudents = true;
+} else {
+    $viewStudents = false;
 }
 
+// Modified query to include student count using LEFT JOIN and COUNT
 $courses = $conn->query("
-    SELECT c.course_id, c.course_name, c.teacher_id, t.first_name, t.last_name 
+    SELECT c.course_id, c.course_name, c.teacher_id, t.first_name, t.last_name,
+           COUNT(e.enrollment_id) as student_count
     FROM courses c
-    JOIN teachers t ON c.teacher_id = t.teacher_id
+    LEFT JOIN teachers t ON c.teacher_id = t.teacher_id
+    LEFT JOIN enrollments e ON c.course_id = e.course_id
+    GROUP BY c.course_id
+    ORDER BY c.course_name
 ");
 
 $coursesDropdown = $conn->query("
@@ -84,6 +94,28 @@ $coursesDropdown = $conn->query("
 ");
 
 $teachers = $conn->query("SELECT * FROM teachers");
+
+// If viewing students of a specific course
+if ($viewStudents && isset($courseId)) {
+    $stmt = $conn->prepare("
+        SELECT s.student_id, s.first_name, s.last_name, s.email, e.enroll_date
+        FROM enrollments e
+        LEFT JOIN students s ON e.student_id = s.student_id
+        WHERE e.course_id = ?
+        ORDER BY s.last_name, s.first_name
+    ");
+    $stmt->bind_param("i", $courseId);
+    $stmt->execute();
+    $courseStudents = $stmt->get_result();
+    $stmt->close();
+    
+    // Get course name for display
+    $stmt = $conn->prepare("SELECT course_name FROM courses WHERE course_id = ?");
+    $stmt->bind_param("i", $courseId);
+    $stmt->execute();
+    $courseInfo = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+}
 ?>
 
 <!DOCTYPE html>
@@ -129,6 +161,9 @@ $teachers = $conn->query("SELECT * FROM teachers");
         th {
             background-color: #333;
             color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .action-links a {
@@ -165,6 +200,27 @@ $teachers = $conn->query("SELECT * FROM teachers");
             max-height: 300px;
             overflow-y: auto;
             border: 1px solid #ccc;
+            scroll-behavior: smooth;
+        }
+        
+        .back-link {
+            margin-bottom: 15px;
+            display: block;
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .student-count {
+            background-color: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 5px;
         }
     </style>
 </head>
@@ -188,75 +244,118 @@ $teachers = $conn->query("SELECT * FROM teachers");
             <a href="enrollments.php">Enrollments</a>
         </div>
 
-        <h2>Add New Course</h2>
-        <form method="POST">
-            <input type="hidden" name="course_id" id="course_id">
-            <div class="form-group">
-                <label>Course Name</label>
-                <input type="text" id="course_name" name="course_name" required>
+        <?php if ($viewStudents && isset($courseId) && isset($courseInfo)): ?>
+            <a href="courses.php" class="back-link">← Back to Courses List</a>
+            <h2>Students enrolled in <?php echo htmlspecialchars($courseInfo['course_name']); ?></h2>
+            
+            <div class="scrollable-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Enrollment Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($courseStudents->num_rows > 0): ?>
+                            <?php while($student = $courseStudents->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                <td><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></td>
+                                <td><?php echo htmlspecialchars($student['email']); ?></td>
+                                <td><?php echo htmlspecialchars($student['enroll_date']); ?></td>
+                            </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="4">No students enrolled in this course.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label>Existing Courses</label>
-                <select id="existing_courses" onchange="selectExistingCourse(this.value)">
-                    <option value="">Select Existing Course</option>
-                    <?php while($course = $coursesDropdown->fetch_assoc()): ?>
-                        <option value="<?php echo $course['course_name']; ?>"><?php echo $course['course_name']; ?></option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Teacher</label>
-                <select id="teacher_id" name="teacher_id" required>
-                    <option value="">Select Teacher</option>
-                    <?php 
-                    $teachers->data_seek(0);
-                    while($teacher = $teachers->fetch_assoc()): 
-                    ?>
-                        <option value="<?php echo $teacher['teacher_id']; ?>">
-                            <?php echo $teacher['first_name'] . ' ' . $teacher['last_name']; ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <button type="submit" name="add">Add Course</button>
-            <button type="submit" name="update" style="display: none;">Update Course</button>
-            <button type="button" id="cancel_edit" style="display: none;">Cancel</button>
-        </form>
+        <?php else: ?>
+            <h2>Add New Course</h2>
+            <form method="POST">
+                <input type="hidden" name="course_id" id="course_id">
+                <div class="form-group">
+                    <label>Course Name</label>
+                    <input type="text" id="course_name" name="course_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Existing Courses</label>
+                    <select id="existing_courses" onchange="selectExistingCourse(this.value)">
+                        <option value="">Select Existing Course</option>
+                        <?php while($course = $coursesDropdown->fetch_assoc()): ?>
+                            <option value="<?php echo $course['course_name']; ?>"><?php echo $course['course_name']; ?></option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Teacher</label>
+                    <select id="teacher_id" name="teacher_id" required>
+                        <option value="">Select Teacher</option>
+                        <?php 
+                        $teachers->data_seek(0);
+                        while($teacher = $teachers->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $teacher['teacher_id']; ?>">
+                                <?php echo $teacher['first_name'] . ' ' . $teacher['last_name']; ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <button type="submit" name="add">Add Course</button>
+                <button type="submit" name="update" style="display: none;">Update Course</button>
+                <button type="button" id="cancel_edit" style="display: none;">Cancel</button>
+            </form>
 
-        <h2>Search Courses</h2>
-        <input type="text" id="searchInput" placeholder="Search by course name or teacher...">
-        <button class="btn" onclick="searchTable()">Search</button>
-        <button class="btn btn-clear" onclick="clearSearch()">Clear</button>
+            <h2>Search Courses</h2>
+            <input type="text" id="searchInput" placeholder="Search by course name or teacher...">
+            <button class="btn" onclick="searchTable()">Search</button>
+            <button class="btn btn-clear" onclick="clearSearch()">Clear</button>
 
-        <h2>Course List</h2>
-        <div class="scrollable-table">
-            <table id="courseTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Course Name</th>
-                        <th>Teacher</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $courses->data_seek(0);
-                    while($course = $courses->fetch_assoc()): 
-                    ?>
-                    <tr>
-                        <td><?php echo $course['course_id']; ?></td>
-                        <td><?php echo $course['course_name']; ?></td>
-                        <td><?php echo $course['first_name'] . ' ' . $course['last_name']; ?></td>
-                        <td class="action-links">
-                            <a href="#" onclick="editCourse(<?php echo $course['course_id']; ?>, '<?php echo $course['course_name']; ?>', <?php echo $course['teacher_id']; ?>)">Edit</a>
-                            <a href="courses.php?delete=<?php echo $course['course_id']; ?>" onclick="return confirm('Are you sure you want to delete this course?')">Delete</a>
-                        </td>
-                    </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        </div>
+            <h2>Course List</h2>
+            <div class="scrollable-table" id="tableContainer">
+                <table id="courseTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Course Name</th>
+                            <th>Teacher</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $courses->data_seek(0);
+                        while($course = $courses->fetch_assoc()): 
+                        ?>
+                        <tr>
+                            <td><?php echo $course['course_id']; ?></td>
+                            <td><?php echo $course['course_name']; ?></td>
+                            <td><?php echo $course['first_name'] . ' ' . $course['last_name']; ?></td>
+                            <td>
+                                <?php 
+                                echo $course['student_count']; 
+                                if ($course['student_count'] > 0) {
+                                    echo ' <a href="courses.php?view_students=' . $course['course_id'] . '">View</a>';
+                                }
+                                ?>
+                            </td>
+                            <td class="action-links">
+                                <a href="#" onclick="editCourse(<?php echo $course['course_id']; ?>, '<?php echo $course['course_name']; ?>', <?php echo $course['teacher_id']; ?>)">Edit</a>
+                                <a href="courses.php?delete=<?php echo $course['course_id']; ?>" onclick="return confirm('Are you sure you want to delete this course?')">Delete</a>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 
     <script>
@@ -298,6 +397,20 @@ $teachers = $conn->query("SELECT * FROM teachers");
             document.getElementById('searchInput').value = '';
             searchTable();
         }
+        
+        // Add scroll wheel support
+        const tableContainer = document.getElementById('tableContainer');
+        
+        tableContainer.addEventListener('wheel', function(e) {
+            // Prevent default scroll behavior
+            e.preventDefault();
+            
+            // Calculate scroll amount based on wheel delta
+            const scrollAmount = e.deltaY;
+            
+            // Scroll the container
+            tableContainer.scrollTop += scrollAmount;
+        }, { passive: false });
     </script>
 </body>
 </html>
