@@ -1,15 +1,11 @@
 <?php
 include("dbconnection.php");
 
-// Search functionality
 $search = '';
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['search'])) {
-    $search = trim($_POST['search_value']);
-}
-
-// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['add'])) {
+    if (isset($_POST['search'])) {
+        $search = trim($_POST['search_value']);
+    } elseif (isset($_POST['add'])) {
         $studentId = $_POST['student_id'];
         $courseId = $_POST['course_id'];
         $enrollDate = $_POST['enroll_date'];
@@ -55,7 +51,6 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// Get all enrollments with search filter
 $query = "
     SELECT e.enrollment_id, e.enroll_date, 
            s.student_id, s.first_name as student_first, s.last_name as student_last,
@@ -79,7 +74,6 @@ if (!empty($search)) {
 $query .= " ORDER BY e.enrollment_id ASC";
 $enrollments = $conn->query($query);
 
-// Get all students and courses for dropdowns
 $students = $conn->query("SELECT * FROM students ORDER BY last_name, first_name");
 $courses = $conn->query("SELECT * FROM courses");
 ?>
@@ -185,19 +179,25 @@ $courses = $conn->query("SELECT * FROM courses");
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($enrollment = $enrollments->fetch_assoc()): ?>
-                    <tr>
-                        <td><?php echo $enrollment['enrollment_id']; ?></td>
-                        <td><?php echo $enrollment['student_first'] . ' ' . $enrollment['student_last']; ?></td>
-                        <td><?php echo $enrollment['course_name']; ?></td>
-                        <td><?php echo $enrollment['teacher_first'] . ' ' . $enrollment['teacher_last']; ?></td>
-                        <td><?php echo $enrollment['enroll_date']; ?></td>
-                        <td class="action-links">
-                            <a href="#" onclick="editEnrollment(<?php echo $enrollment['enrollment_id']; ?>, <?php echo $enrollment['student_id']; ?>, <?php echo $enrollment['course_id']; ?>, '<?php echo $enrollment['enroll_date']; ?>')">Edit</a>
-                            <a href="enrollments.php?delete=<?php echo $enrollment['enrollment_id']; ?>" onclick="return confirm('Are you sure you want to delete this enrollment?')">Delete</a>
-                        </td>
-                    </tr>
-                    <?php endwhile; ?>
+                    <?php if ($enrollments->num_rows > 0): ?>
+                        <?php while($enrollment = $enrollments->fetch_assoc()): ?>
+                        <tr>
+                            <td><?php echo $enrollment['enrollment_id']; ?></td>
+                            <td><?php echo $enrollment['student_first'] . ' ' . $enrollment['student_last']; ?></td>
+                            <td><?php echo $enrollment['course_name']; ?></td>
+                            <td><?php echo $enrollment['teacher_first'] . ' ' . $enrollment['teacher_last']; ?></td>
+                            <td><?php echo $enrollment['enroll_date']; ?></td>
+                            <td class="action-links">
+                                <a href="#" onclick="editEnrollment(<?php echo $enrollment['enrollment_id']; ?>, <?php echo $enrollment['student_id']; ?>, <?php echo $enrollment['course_id']; ?>, '<?php echo $enrollment['enroll_date']; ?>')">Edit</a>
+                                <a href="enrollments.php?delete=<?php echo $enrollment['enrollment_id']; ?>" onclick="return confirm('Are you sure you want to delete this enrollment?')">Delete</a>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6">No enrollments found.</td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
