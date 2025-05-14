@@ -3,6 +3,10 @@ include("dbconnection.php");
 session_start();
 
 $searchTerm = '';
+$viewCourses = false;
+$studentCourses = null;
+$studentInfo = null;
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add'])) {
         $firstName = $_POST['first_name'];
@@ -75,8 +79,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 } elseif (isset($_GET['view_courses'])) {
     $studentId = $_GET['view_courses'];
     $viewCourses = true;
-} else {
-    $viewCourses = false;
 }
 
 // Search query
@@ -91,7 +93,6 @@ if (!empty($searchTerm)) {
     $students = $conn->query("SELECT * FROM students");
 }
 
-// Get course enrollment counts using LEFT JOIN
 $studentEnrollmentCounts = $conn->query("
     SELECT s.student_id, COUNT(e.enrollment_id) as course_count
     FROM students s
@@ -99,13 +100,11 @@ $studentEnrollmentCounts = $conn->query("
     GROUP BY s.student_id
 ");
 
-// Convert to associative array for easy lookup
 $enrollmentCountsByStudent = [];
 while($row = $studentEnrollmentCounts->fetch_assoc()) {
     $enrollmentCountsByStudent[$row['student_id']] = $row['course_count'];
 }
 
-// Get detailed course info if viewing a specific student's courses
 if ($viewCourses && isset($studentId)) {
     $stmt = $conn->prepare("
         SELECT c.course_id, c.course_name, e.enroll_date, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
@@ -128,6 +127,7 @@ if ($viewCourses && isset($studentId)) {
     $stmt->close();
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -157,7 +157,6 @@ if ($viewCourses && isset($studentId)) {
         .scrollable-table th {
             background-color: #333;
             color: white;
-            /* Optional: stick the header row */
             position: sticky;
             top: 0;
             z-index: 2;
@@ -351,4 +350,5 @@ if ($viewCourses && isset($studentId)) {
 </body>
 </html>
 <?php $conn->close(); ?>
+
 
